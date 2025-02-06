@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homeless Hub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #1c1c1c;
+            color: #e0e0e0;
+            font-family: 'Roboto Mono', monospace;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #2a2a2a;
+            padding: 15px 30px;
+        }
+        h1 {
+            color: #fff;
+            font-size: 1.5em;
+            margin: 0;
+        }
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+        }
+        nav ul li {
+            margin-right: 20px;
+        }
+        nav ul li a {
+            color: #e0e0e0;
+            text-decoration: none;
+        }
+        main {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+        .content-box {
+            background: #333;
+            padding: 20px;
+            width: 90%;
+            max-width: 1200px;
+        }
+        .search-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .filters {
+            flex: 1;
+            padding: 15px;
+            background: #555;
+            
+        }
+        .results-container {
+            display: flex;
+            gap: 20px;
+            font-family: 'Arial', sans-serif;
+
+        }
+        #results {
+            flex: 1;
+            background: #555;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .map-container {
+            flex: 2;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+        label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            color: #e0e0e0;
+        }
+        input[type="checkbox"] {
+            margin-right: 8px;
+            width: 20px;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Homeless Hub</h1>
+        <nav>
+            <ul>
+                <li><a href="/#/">Shelter</a></li>
+                <li><a href="food">Food</a></li>
+                <!-- <li><a href="resume">Resume</a></li> --->
+                <li><a href="health">Health</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="content-box">
+            <h2>Service Finder</h2>
+            <p><i>press search to get started.</i></p>
+            <div class="search-container">
+                <div class="filters">
+                    <form id="searchForm">
+                        <label><input type="checkbox" name="CLOTHING"> Clothing</label>
+                        <label><input type="checkbox" name="FOOD_GROCERIES"> Food/Groceries</label>
+                        <label><input type="checkbox" name="HOUSING"> Housing</label>
+                        <label><input type="checkbox" name="LAUNDRY"> Laundry</label>
+                        <label><input type="checkbox" name="MEDICAL_SERVICES"> Medical Services</label>
+                        <label><input type="checkbox" name="MEALS"> Meals</label>
+                        <label><input type="checkbox" name="SHOWERS"> Showers</label>
+                        <label><input type="checkbox" name="STORAGE"> Storage</label>
+                        <label><input type="checkbox" name="VOCATIONAL_TRAINING"> Job Training Oppurtunies</label>
+                        <button type="submit">Search</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="results-container">
+                <div id="results"></div>
+                <div class="map-container">
+                    <div id="map"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        let map;
+        let markers = [];
+        let markerGroup;
+    
+        function initMap() {
+            map = L.map('map').setView([38.9072, -77.0369], 12); //  (Washington, DC)
+    
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+    
+            markerGroup = L.layerGroup().addTo(map);
+        }
+    
+        // haversine formula | finding distance on the globe
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 3958.8; // Radius of the Earth in miles
+            const dLat = deg2rad(lat2 - lat1);
+            const dLon = deg2rad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const d = R * c;
+            return d;
+        }
+    
+        // helper function to convert degrees -> radians
+        function deg2rad(deg) {
+            return deg * (Math.PI / 180);
+        }
+    
+       
+        function clearMarkers() {
+            markerGroup.clearLayers();
+        }
+    
+        // doesnt really work ngl im not going to fix this 
+        const userIcon = L.divIcon({
+            html: '📍',
+            iconSize: [25, 25],
+            className: 'user-location'
+        });
+    
+      
+        function createNumberedIcon(number) {
+            return L.divIcon({
+                html: `<div style="background-color: #2196F3; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold;">${number}</div>`,
+                iconSize: [24, 24],
+                className: 'numbered-marker'
+            });
+        }
+    
+        //search form 
+        document.getElementById('searchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+    
+            let userLat, userLon;
+            if (navigator.geolocation) {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject);
+                });
+                userLat = position.coords.latitude;
+                userLon = position.coords.longitude;
+    
+               n
+                map.setView([userLat, userLon], 12);
+    
+                //icl this doenst work i think
+                L.marker([userLat, userLon], {
+                    icon: userIcon,
+                    title: 'Your Location'
+                }).addTo(markerGroup);
+    
+            } else {
+                alert("Geolocation is not supported by this browser.");
+                return;
+            }
+    
+            // form handling 
+            const formData = new FormData(e.target);
+            const queryParams = new URLSearchParams();
+            for (let [key] of formData.entries()) {
+                queryParams.append(key, "true");
+            }
+    
+            try {
+                // fetch data from the server
+                const response = await fetch(`/search?${queryParams.toString()}`);
+                const data = await response.json();
+                console.log(data);
+    
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = "";
+    
+                clearMarkers();
+    
+                if (data.length === 0) {
+                    resultsDiv.textContent = "No results found.";
+                } else {
+                    const bounds = L.latLngBounds([userLat, userLon]);
+    
+                    // distance calculation
+                    const resultsWithDistance = data.map(item => {
+                        const lat = parseFloat(item["LATITUDE"]);
+                        const lon = parseFloat(item["LONGITUDE"]);
+                        const distance = getDistance(userLat, userLon, lat, lon);
+                        return { ...item, distance };
+                    });
+    
+                    // sor results by ascending by distance
+                    resultsWithDistance.sort((a, b) => a.distance - b.distance);
+    
+                    // display results
+                    resultsWithDistance.forEach((item, index) => {
+                        const programName = item["PROGRAM_NAME"] || "Unnamed Program";
+                        const address = item["ADDRESS"] || "Address not available";
+                        const lat = parseFloat(item["LATITUDE"]);
+                        const lon = parseFloat(item["LONGITUDE"]);
+                        const distance = item.distance.toFixed(2); // distance is already calculated
+                        const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${address.replace(/ /g, '+')}`;
+    
+                        // add result markers
+                        const marker = L.marker([lat, lon], {
+                            icon: createNumberedIcon(index + 1),
+                            title: programName
+                        }).addTo(markerGroup);
+    
+                        // popup
+                        marker.bindPopup(`
+                            <strong>${programName}</strong><br>
+                            ${address}<br>
+                            Distance: ${distance} miles
+                        `);
+    
+                        // extend map
+                        bounds.extend([lat, lon]);
+    
+                        // formatting for results and also adding to the result window
+                        const div = document.createElement('div');
+                        div.innerHTML = `
+                            <strong>${index + 1}. ${programName}</strong><br>
+                            Address: ${address}<br>
+                            Distance: ${distance} miles<br>
+                            <a href="${googleMapsLink}" target="_blank">View on Google Maps</a><br><br>
+                        `;
+                        resultsDiv.appendChild(div);
+                    });
+    
+                    // extend map again
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            } catch (error) {
+                console.error("Error fetching search results:", error);
+            }
+        });
+    
+        // start map on load
+        window.onload = initMap;
+    </script>
+</body>
+</html>
